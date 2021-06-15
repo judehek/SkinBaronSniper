@@ -1,6 +1,7 @@
 import com.google.gson.*;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.StringEntity;
 import org.openqa.selenium.By;
@@ -38,26 +39,29 @@ public class Main
 	public static final String pEmpireKey = "68cef992-9cca-4d1d-81bb-0a11ffc74185";
 	public static int servers;
 	public static int serverNumber;
+	public static int startRange;
+	public static int endRange;
 	public static ArrayList<String> settings;
 	public static ArrayList<Double> maxPrices;
 
 	public static void main(String[] args) throws InterruptedException, IOException
 	{
-		System.out.println("Version: 3.4");
-		System.setProperty("webdriver.gecko.driver", "H:\\IntelliJ Projects\\SkinBaronBot\\driver\\geckodriver.exe");
-		//System.setProperty("webdriver.gecko.driver", "/root/skinbaron/driver/geckodriver");
+
+		System.out.println("Version: 3.5");
+		//System.setProperty("webdriver.gecko.driver", "H:\\IntelliJ Projects\\SkinBaronBot\\driver\\geckodriver.exe");
+		System.setProperty("webdriver.gecko.driver", "/root/skinbaron/driver/geckodriver");
 
 		boolean useApi = false;
 
 		settings = checkSettings();
 		maxPrices = new ArrayList<>();
 		servers = Integer.parseInt(settings.get(1));
-		//serverNumber = checkServerNumber();
-		serverNumber = 2;
+		serverNumber = checkServerNumber();
+		//serverNumber = 1;
 		System.out.println("Server Number: " + serverNumber);
 
-		int startRange = (((settings.size() - 2) / servers) * (serverNumber - 1));
-		int endRange = (startRange + (settings.size() - 2) / servers);
+		startRange = (((settings.size() - 2) / servers) * (serverNumber - 1));
+		endRange = (startRange + (settings.size() - 2) / servers);
 
 		ExecutorService executor = Executors.newFixedThreadPool((settings.size() - 2) / servers);
 
@@ -129,10 +133,10 @@ public class Main
 						}
 						driver.close();
 					}
-					for (int i = 0; i < settings.size() - 2; i++)
-					{
-						System.out.println((settings.get(i) + 2) + ": " + maxPrices.get(i));
-					}
+					//for (int i = startRange; i < endRange; i++)
+					//{
+					//	System.out.println((settings.get(i + 2)) + ": " + maxPrices.get(i));
+					//}
 				}
 			};
 
@@ -155,6 +159,7 @@ public class Main
 			errors.execute();
 			throw e;
 		}
+
 		while (true)
 		{
 			for (int i = startRange; i < endRange; i++) //(Gun | Skin,Maximum float,Maximum price)
@@ -277,17 +282,23 @@ public class Main
 		String buffEndString = allPrice.substring(subInt);
 		int buffEnd = buffEndString.indexOf(".") + 3;
 		String price = buffEndString.substring(0, buffEnd);
+		System.out.println("\n\n\n\n\n\n\n\n" + allPrice);
 		if (price.contains("hase"))
 		{
 			price = price.substring(8);
 		}
+		else
+		{
+			price = price.substring(8);
+		}
+		System.out.println("\n\n\n\n\n\n\n\n" + price);
 		String priceRemoveCommas = price.replace(",", "");
 		//discountedPrice = Double.parseDouble(priceRemoveCommas.substring(1)) * 0.84;
 		discountedPrice = Double.parseDouble(priceRemoveCommas) * 0.81;
-		return convertCurrency(discountedPrice);
+		return usdToEuro(discountedPrice);
 	}
 
-	public static double convertCurrency(double usd)
+	public static double usdToEuro(double usd)
 	{
 		HttpClient client = HttpClients.custom()
 				.setDefaultRequestConfig(RequestConfig.custom()
@@ -407,34 +418,34 @@ public class Main
 
 	private static void printChanges(ArrayList<String> oldPrices)
 	{
-		String json = "{\n" +
-				"  \"content\": \"";
-		for (int i = 0; i < settings.size() - 1; i++)
+		String json = "";
+		for (int i = startRange; i < endRange; i++)
 		{
-			json.concat(settings.get(i + 1) + "\n" + oldPrices.get(i) + " :arrow_right: " + maxPrices.get(i));
+			String skinName = settings.get(i + 2).substring(2);
+			json = "{" +
+					"\"content\": " + "\""
+					+ skinName + " " + String.valueOf(oldPrices.get(i)) +
+					"  :arrow_right:  " + String.valueOf(maxPrices.get(i)) + "\"}";
 
-			if (i == settings.size() - 2)
-			{
-				json.concat("}");
-			}
-		}
-		HttpClient client = HttpClients.custom()
-				.setDefaultRequestConfig(RequestConfig.custom()
-						.setCookieSpec(CookieSpecs.STANDARD).build())
-				.build();
-		try
-		{
-			HttpEntity entity = new StringEntity(json);
-			HttpUriRequest request = RequestBuilder.post()
-					.setUri("https://discord.com/api/webhooks/849714479695921192/57wLUno4WezBhZW3L_B7OLngBkrHwsWok6diIlzDj6QjEBxfVUVs9ygAqGlisK4lo4RW")
-					.addHeader("Content-Type", "application/json")
-					.setEntity(entity)
+			HttpClient client = HttpClients.custom()
+					.setDefaultRequestConfig(RequestConfig.custom()
+							.setCookieSpec(CookieSpecs.STANDARD).build())
 					.build();
-			HttpResponse response = client.execute(request);
-		}
-		catch (IOException e)
-		{
-			e.printStackTrace();
+			try
+			{
+				HttpEntity entity = new StringEntity(json);
+				HttpUriRequest request = RequestBuilder.post()
+						.setUri("https://discord.com/api/webhooks/849714479695921192/57wLUno4WezBhZW3L_B7OLngBkrHwsWok6diIlzDj6QjEBxfVUVs9ygAqGlisK4lo4RW")
+						.setHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+						.setEntity(entity)
+						.build();
+				HttpResponse response = client.execute(request);
+				System.out.println(response);
+			}
+			catch (IOException e)
+			{
+				e.printStackTrace();
+			}
 		}
 	}
 
