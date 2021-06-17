@@ -1,5 +1,4 @@
 import com.google.gson.*;
-import com.google.gson.stream.JsonReader;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpResponse;
@@ -13,11 +12,15 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
 import java.awt.*;
+import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 
 import static java.lang.Double.parseDouble;
@@ -40,7 +43,7 @@ public class MarketHandler implements Runnable
 	@Override
 	public void run()
 	{
-		System.out.println(Thread.currentThread().getName() + " - " + skinName + "/" + maxWear + "/" + maxPrice);
+		//System.out.println(Thread.currentThread().getName() + " - " + skinName + "/" + maxWear + "/" + maxPrice);
 		ArrayList<String> listings = search(skinName, maxWear, maxPrice);
 
 		for (int i = 0; i < listings.size(); i++)
@@ -105,16 +108,20 @@ public class MarketHandler implements Runnable
 				balanceFormat.setRoundingMode(RoundingMode.FLOOR);
 
 				String purchaseResponse = purchase(split[1], Double.valueOf(split[2]));
-				if (purchaseResponse.equals(
-						"{ \"generalErrors\": [ \"some offer(s) already in another shopping cart and/or sold\" ] }"))
+				if (purchaseResponse.contains("some offer(s) already in another shopping cart"))
 				{
 					try
 					{
-						FileWriter myWriter = new FileWriter("log.txt");
-						myWriter.write(
-								"Item sold: " + split[0] + ", Price: " + split[2] + ", Balance: " + balanceFormat.format(
+						DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+						LocalDateTime now = LocalDateTime.now();
+
+						File file = new File("/root/skinbaron/driver/geckodriver/log.txt");
+						FileWriter fw = new FileWriter(file);
+						BufferedWriter writer = new BufferedWriter(fw);
+						writer.write(
+								"[" + dtf.format(now) + "] Item sold: " + split[0] + ", Price: " + split[2] + ", Balance: " + balanceFormat.format(
 										getBalance()));
-						myWriter.close();
+						writer.close();
 					}
 					catch (IOException e)
 					{
@@ -173,6 +180,11 @@ public class MarketHandler implements Runnable
 					.build();
 			HttpResponse response = client.execute(request);
 			responseBody = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+
+
+			//System.out.println(responseBody);
+
+
 			try
 			{
 				JsonElement element = JsonParser.parseString(responseBody);
@@ -194,7 +206,8 @@ public class MarketHandler implements Runnable
 			}
 			catch (JsonSyntaxException e)
 			{
-				System.out.println("Rate limit");
+				//System.out.println("Rate limit");
+				Main.addToLimit();
 			}
 
 		}

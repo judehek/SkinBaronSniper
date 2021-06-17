@@ -4,8 +4,7 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.StringEntity;
-import org.openqa.selenium.By;
-import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.*;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.config.CookieSpecs;
@@ -14,7 +13,6 @@ import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
-import org.openqa.selenium.WebElement;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
@@ -36,17 +34,17 @@ import java.util.concurrent.Executors;
 
 public class Main
 {
-	public static final String pEmpireKey = "68cef992-9cca-4d1d-81bb-0a11ffc74185";
-	public static int servers;
-	public static int serverNumber;
-	public static int startRange;
-	public static int endRange;
-	public static ArrayList<String> settings;
-	public static ArrayList<Double> maxPrices;
+	private static final String pEmpireKey = "68cef992-9cca-4d1d-81bb-0a11ffc74185";
+	private static int servers;
+	private static int serverNumber;
+	private static int startRange;
+	private static int endRange;
+	private static int rateLimits;
+	private static ArrayList<String> settings;
+	private static ArrayList<Double> maxPrices;
 
 	public static void main(String[] args) throws InterruptedException, IOException
 	{
-
 		System.out.println("Version: 3.5");
 		//System.setProperty("webdriver.gecko.driver", "H:\\IntelliJ Projects\\SkinBaronBot\\driver\\geckodriver.exe");
 		System.setProperty("webdriver.gecko.driver", "/root/skinbaron/driver/geckodriver");
@@ -56,6 +54,7 @@ public class Main
 		settings = checkSettings();
 		maxPrices = new ArrayList<>();
 		servers = Integer.parseInt(settings.get(1));
+		//servers = 3;
 		serverNumber = checkServerNumber();
 		//serverNumber = 1;
 		System.out.println("Server Number: " + serverNumber);
@@ -73,20 +72,20 @@ public class Main
 
 		maxPriceSetup();
 
-		try
+		Timer timer = new Timer();
+		boolean finalUseApi = useApi;
+		TimerTask dailyUpdate = new TimerTask()
 		{
-			Timer timer = new Timer();
-			boolean finalUseApi = useApi;
-			TimerTask dailyUpdate = new TimerTask()
+			@Override
+			public void run()
 			{
-				@Override
-				public void run()
+				ArrayList<Double> oldPrices = (ArrayList<Double>) maxPrices.clone();
+				WebDriver driver = new FirefoxDriver();
+				for (int i = startRange; i < endRange; i++)
 				{
-					ArrayList<String> oldPrices = (ArrayList<String>) maxPrices.clone();
-					WebDriver driver = new FirefoxDriver();
-					for (int i = startRange; i < endRange; i++)
+					String skinName = settings.get(i + 2);
+					try
 					{
-						String skinName = settings.get(i + 2);
 						if (finalUseApi)
 						{
 							maxPrices.set(i, empirePriceApi(skinName));
@@ -96,69 +95,72 @@ public class Main
 							maxPrices.set(i, empirePriceScrape(driver, skinName));
 						}
 					}
-					driver.close();
-
-					//saveTimeStamp();
-
-					printChanges(oldPrices);
-
-
-				}
-
-			};
-			TimerTask settingsCheck = new TimerTask()
-			{
-				@Override
-				public void run()
-				{
-					ArrayList<String> settingsUpdatedCheck = checkSettings();
-					ArrayList<String> oldSettings = (ArrayList<String>) settings.clone();
-					if (settingsUpdatedCheck != oldSettings)
+					catch (StaleElementReferenceException | TimeoutException e)
 					{
-						Collection<String> difference = CollectionUtils.subtract(settingsUpdatedCheck, oldSettings);
-						ArrayList<String> differenceConverted = (ArrayList<String>) difference;
-						WebDriver driver = new FirefoxDriver();
-						for (int i = 0; i < differenceConverted.size(); i++)
+						if (finalUseApi)
 						{
-							System.out.println("next skin " + i);
-							settings.add(differenceConverted.get(i));
-							if (finalUseApi)
-							{
-								maxPrices.set(i, empirePriceApi(differenceConverted.get(i)));
-							}
-							else
-							{
-								maxPrices.set(i, empirePriceScrape(driver, differenceConverted.get(i)));
-							}
+							maxPrices.set(i, empirePriceApi(skinName));
 						}
-						driver.close();
+						else
+						{
+							maxPrices.set(i, empirePriceScrape(driver, skinName));
+						}
 					}
-					//for (int i = startRange; i < endRange; i++)
-					//{
-					//	System.out.println((settings.get(i + 2)) + ": " + maxPrices.get(i));
-					//}
 				}
-			};
+				driver.close();
 
-			timer.schedule(dailyUpdate, 1, 1000 * 60 * 60 * 24);
-			timer.schedule(settingsCheck, 1, 1000 * 60 * 5);
-		}
-		catch (RuntimeException e)
+				//saveTimeStamp();
+
+				if (oldPrices.get(startRange) != 1.69)
+				{
+					printChanges(oldPrices);
+				}
+			}
+		};
+		TimerTask settingsCheck = new TimerTask()
 		{
-			DiscordWebhook errors = new DiscordWebhook(
-					"https://discord.com/api/webhooks/849714479695921192/57wLUno4WezBhZW3L_B7OLngBkrHwsWok6diIlzDj6QjEBxfVUVs9ygAqGlisK4lo4RW");
-			errors.setContent("Runtime Exception " + e.getStackTrace());
-			errors.execute();
-			return;
-		}
-		catch (Throwable e)
-		{
-			DiscordWebhook errors = new DiscordWebhook(
-					"https://discord.com/api/webhooks/849714479695921192/57wLUno4WezBhZW3L_B7OLngBkrHwsWok6diIlzDj6QjEBxfVUVs9ygAqGlisK4lo4RW");
-			errors.setContent("Throwable " + e.getStackTrace());
-			errors.execute();
-			throw e;
-		}
+			@Override
+			public void run()
+			{
+				clearRateLimits();
+				ArrayList<String> settingsUpdatedCheck = checkSettings();
+				ArrayList<String> oldSettings = (ArrayList<String>) settings.clone();
+
+				if (!settingsUpdatedCheck.get(settings.size() - 3).equals(oldSettings.get(settings.size() - 3)))
+				{
+					Collection<String> difference = CollectionUtils.subtract(settingsUpdatedCheck, oldSettings);
+					ArrayList<String> differenceConverted = (ArrayList<String>) difference;
+					WebDriver driver = new FirefoxDriver();
+					for (int i = 0; i < differenceConverted.size(); i++)
+					{
+						System.out.println("next skin " + i);
+						settings.add(differenceConverted.get(i));
+						if (finalUseApi)
+						{
+							maxPrices.set(i, empirePriceApi(differenceConverted.get(i)));
+						}
+						else
+						{
+							maxPrices.set(i, empirePriceScrape(driver, differenceConverted.get(i)));
+						}
+					}
+					driver.close();
+				}
+				for (int i = startRange; i < endRange; i++)
+				{
+					if (i == endRange - 1)
+					{
+						System.out.println((settings.get(i + 2)) + ": " + maxPrices.get(
+								i) + "\n" + "Rate Limits: " + getRateLimits());
+						break;
+					}
+					System.out.println((settings.get(i + 2)) + ": " + maxPrices.get(i));
+				}
+			}
+		};
+
+		timer.schedule(dailyUpdate, 1, 1000 * 60 * 60 * 24);
+		timer.schedule(settingsCheck, 1, 1000 * 60 * 5);
 
 		while (true)
 		{
@@ -256,44 +258,19 @@ public class Main
 		new WebDriverWait(driver, 60).until(
 				ExpectedConditions.visibilityOfAllElementsLocatedBy(By.className("--price")));
 		List<WebElement> priceProviders = driver.findElements(By.className("--price"));
-
-		//new WebDriverWait(driver, 60).until(
-		//		ExpectedConditions.visibilityOfAllElementsLocatedBy(By.className("lite-price")));
-		//List<WebElement> priceProviders = driver.findElements(By.className("lite-price"));
-
-		//ArrayList<String> names = new ArrayList<>();
-		//ArrayList<String> prices = new ArrayList<>();
-
-		/*String price = "";
-		for (int i = 0; i < priceProviders.size(); i++)
-		{
-			names.add(priceProviders.get(i).findElement(By.className("name")).getText());
-			prices.add(priceProviders.get(i).findElement(By.className("price")).getText());
-
-			if (names.get(i).equalsIgnoreCase("buff"))
-			{
-				price = prices.get(i);
-				break;
-			}
-		}*/
-
 		String allPrice = priceProviders.get(0).getText();
+		//System.out.println(allPrice);
 		int subInt = allPrice.indexOf("Buff") + 6;
 		String buffEndString = allPrice.substring(subInt);
 		int buffEnd = buffEndString.indexOf(".") + 3;
 		String price = buffEndString.substring(0, buffEnd);
-		System.out.println("\n\n\n\n\n\n\n\n" + allPrice);
 		if (price.contains("hase"))
 		{
 			price = price.substring(8);
 		}
-		else
-		{
-			price = price.substring(8);
-		}
-		System.out.println("\n\n\n\n\n\n\n\n" + price);
+		//else { price.substring(8); }
 		String priceRemoveCommas = price.replace(",", "");
-		//discountedPrice = Double.parseDouble(priceRemoveCommas.substring(1)) * 0.84;
+
 		discountedPrice = Double.parseDouble(priceRemoveCommas) * 0.81;
 		return usdToEuro(discountedPrice);
 	}
@@ -384,7 +361,6 @@ public class Main
 		}
 	}
 
-
 	private static double checkFloat(String skinName)
 	{
 		double maxWear;
@@ -416,12 +392,12 @@ public class Main
 		return maxWear;
 	}
 
-	private static void printChanges(ArrayList<String> oldPrices)
+	private static void printChanges(ArrayList<Double> oldPrices)
 	{
 		String json = "";
 		for (int i = startRange; i < endRange; i++)
 		{
-			String skinName = settings.get(i + 2).substring(2);
+			String skinName = settings.get(i + 2).replace("\u2605 ", "");
 			json = "{" +
 					"\"content\": " + "\""
 					+ skinName + " " + String.valueOf(oldPrices.get(i)) +
@@ -441,8 +417,9 @@ public class Main
 						.build();
 				HttpResponse response = client.execute(request);
 				System.out.println(response);
+				Thread.sleep(550);
 			}
-			catch (IOException e)
+			catch (IOException | InterruptedException e)
 			{
 				e.printStackTrace();
 			}
@@ -471,6 +448,21 @@ public class Main
 		{
 			maxPrices.add(1.69);
 		}
+	}
+
+	public static int getRateLimits()
+	{
+		return rateLimits;
+	}
+
+	public static void addToLimit()
+	{
+		rateLimits += 1;
+	}
+
+	public static void clearRateLimits()
+	{
+		rateLimits = 0;
 	}
 
 }
