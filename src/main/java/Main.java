@@ -45,6 +45,7 @@ public class Main
 
 	public static void main(String[] args) throws InterruptedException, IOException
 	{
+		Object test = new Object();
 		System.out.println("Version: 3.5");
 		//System.setProperty("webdriver.gecko.driver", "H:\\IntelliJ Projects\\SkinBaronBot\\driver\\geckodriver.exe");
 		System.setProperty("webdriver.gecko.driver", "/root/skinbaron/driver/geckodriver");
