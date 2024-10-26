@@ -27,7 +27,7 @@ import static java.lang.Double.parseDouble;
 
 public class MarketHandler implements Runnable
 {
-	private static final String sBaronKey = "1602273-1b80c4a8-4d4d-4ecc-9eb5-58a085cb4a45";
+	private static final String sBaronKey = "";
 
 	private final String skinName;
 	private final double maxPrice;
