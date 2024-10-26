@@ -34,7 +34,7 @@ import java.util.concurrent.Executors;
 
 public class Main
 {
-	private static final String pEmpireKey = "68cef992-9cca-4d1d-81bb-0a11ffc74185";
+	private static final String pEmpireKey = "";
 	private static int servers;
 	private static int serverNumber;
 	private static int startRange;
